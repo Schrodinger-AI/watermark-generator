@@ -1,0 +1,9 @@
+version: "3.3"
+
+services:
+  watermarkgenerator:
+    image: watermarkgenerator:latest
+    ports:
+      - "5069:80"
+    volumes:
+      - ./logs/log-20230312.txt:/var/logs/log.txt:ro
