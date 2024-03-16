@@ -1,4 +1,5 @@
 using Serilog;
+using WebApiClient.interfaces;
 
 namespace WebApiClient;
 
@@ -7,6 +8,14 @@ public class Startup
     // This method gets called by the runtime. Use this method to add services to the container.
     public void ConfigureServices(IServiceCollection services)
     {
+        var builder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        var configuration = builder.Build();
+        var watermarkSettings = configuration.GetSection("Watermark").Get<WatermarkSettings>();
+        services.AddSingleton(watermarkSettings);
+        var resizeSettings = configuration.GetSection("Resize").Get<ResizeSettings>();
+        services.AddSingleton(resizeSettings);
         // Add framework services.
         services.AddControllers();
     }
@@ -27,7 +36,7 @@ public class Startup
         app.UseHttpsRedirection();
         app.UseRouting();
         app.UseAuthorization();
-        app.UseStaticFiles(); 
+        app.UseStaticFiles();
         app.UseDirectoryBrowser();
 
         // Create log folder if it doesn't exist
@@ -46,9 +55,6 @@ public class Startup
         // Add Serilog to the logger factory
         loggerFactory.AddSerilog();
 
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapControllers();
-        });
+        app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
     }
 }

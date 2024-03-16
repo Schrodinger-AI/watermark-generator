@@ -12,18 +12,16 @@ namespace WebApiClient.controllers;
 [ApiController]
 public class ImageController : ControllerBase
 {
-    private static readonly Config Config = new Config
-    {
-        FontSize = 12,
-        PaddingX = 1,
-        PaddingY = 1,
-        FilePath = "font/SpaceMono-Regular.ttf"
-    };
+    private WatermarkSettings _watermarkSettings;
+    private ResizeSettings _resizeSettings;
     private readonly ILogger<ImageController> _logger;
 
-    public ImageController(ILogger<ImageController> logger)
+    public ImageController(ILogger<ImageController> logger, WatermarkSettings watermarkSettings,
+        ResizeSettings resizeSettings)
     {
         _logger = logger;
+        _watermarkSettings = watermarkSettings;
+        _resizeSettings = resizeSettings;
     }
 
     [HttpPost("process")]
@@ -35,33 +33,14 @@ public class ImageController : ControllerBase
             var inputBytes = Convert.FromBase64String(request.SourceImage.Split(",")[1]);
 
             // Load the input image from byte array
-            using var image = Image.Load(inputBytes);
-
-            // Define the font and text options for your watermark
-            var fonts = new FontCollection();
-            var fontFamily = fonts.Add(Config.FilePath);
-            var font = fontFamily.CreateFont(Config.FontSize, FontStyle.Regular);
-
-            var text = request.Watermark.Text;
-
-            var textSize = TextMeasurer.MeasureAdvance(text, new TextOptions(font));
-            var textLocation = new PointF(image.Width - textSize.Width - Config.PaddingX, image.Height - textSize.Height - Config.PaddingY);
-
-            var backgroundRectangle = new RectangularPolygon(textLocation.X - Config.PaddingX, textLocation.Y - Config.PaddingY, textSize.Width + 2 * Config.PaddingX, textSize.Height + 2 * Config.PaddingY);
-            image.Mutate(x => x.Fill(Color.White.WithAlpha(0.6f), backgroundRectangle));
-
-            // Apply the watermark
-            image.Mutate(x =>
-                x.DrawText(
-                    text,
-                    font,
-                    Color.Black.WithAlpha(0.6f),
-                    textLocation
-                )
-            );
+            using var imageBig = Image.Load(inputBytes);
 
             // Convert the watermarked image to Base64 string
-            var outputBase64 = ConvertToBase64(image);
+            var outputBase64 = AddWatermark(imageBig, request.Watermark.Text);
+
+            using var imageSmall = Image.Load(inputBytes);
+            imageSmall.Mutate(x => x.Resize(_resizeSettings.Width, _resizeSettings.Height));
+            var resizedBase64 = AddWatermark(imageSmall, request.Watermark.Text);
 
             var logDetails = new WatermarkApiSchema.LogDetails
             {
@@ -75,7 +54,11 @@ public class ImageController : ControllerBase
 
             _logger.LogInformation("Image processed successfully. {@LogDetails}", logDetails);
 
-            return Ok(new { ProcessedImage = $"data:image/webp;base64,{outputBase64}" });
+            return Ok(new
+            {
+                ProcessedImage = $"data:image/webp;base64,{outputBase64}",
+                Resized = $"data:image/webp;base64,{resizedBase64}",
+            });
         }
         catch (Exception ex)
         {
@@ -95,6 +78,39 @@ public class ImageController : ControllerBase
             };
             return StatusCode(500, errorResponse);
         }
+    }
+
+    private string AddWatermark(Image image, string text)
+    {
+        var config = _watermarkSettings.Big;
+        if (image.Size.Width < _watermarkSettings.Cutoff)
+        {
+            config = _watermarkSettings.Small;
+        }
+
+        var fonts = new FontCollection();
+        var fontFamily = fonts.Add(config.FilePath);
+        var font = fontFamily.CreateFont(config.FontSize, FontStyle.Regular);
+
+        var textSize = TextMeasurer.MeasureAdvance(text, new TextOptions(font));
+        var textLocation = new PointF(image.Width - textSize.Width - config.PaddingX,
+            image.Height - textSize.Height - config.PaddingY);
+
+        var backgroundRectangle = new RectangularPolygon(image.Width - textSize.Width - 2 * config.PaddingX,
+            image.Height - textSize.Height - 2 * config.PaddingY, textSize.Width + 2 * config.PaddingX,
+            textSize.Height + 2 * config.PaddingY);
+
+        image.Mutate(x => x.Fill(Color.White.WithAlpha(0.32f), backgroundRectangle));
+        // Apply the watermark
+        image.Mutate(x =>
+            x.DrawText(
+                text,
+                font,
+                Color.Black.WithAlpha(0.6f),
+                textLocation
+            )
+        );
+        return ConvertToBase64(image);
     }
 
     // Convert the image to Base64 string
