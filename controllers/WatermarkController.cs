@@ -93,10 +93,10 @@ public class ImageController : ControllerBase
         var font = fontFamily.CreateFont(config.FontSize, FontStyle.Regular);
 
         var textSize = TextMeasurer.MeasureAdvance(text, new TextOptions(font));
-        var textLocation = new PointF(image.Width - textSize.Width - config.PaddingX,
+        var textLocation = new PointF((image.Width - textSize.Width - config.PaddingX) / 2,
             image.Height - textSize.Height - config.PaddingY);
 
-        var backgroundRectangle = new RectangularPolygon(image.Width - textSize.Width - 2 * config.PaddingX,
+        var backgroundRectangle = new RectangularPolygon((image.Width - textSize.Width - 2 * config.PaddingX) / 2,
             image.Height - textSize.Height - 2 * config.PaddingY, textSize.Width + 2 * config.PaddingX,
             textSize.Height + 2 * config.PaddingY);
 
