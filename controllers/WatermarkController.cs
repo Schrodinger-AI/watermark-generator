@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing;
@@ -30,16 +29,7 @@ public class ImageController : ControllerBase
     {
         if (string.IsNullOrEmpty(request.SourceImage) || string.IsNullOrEmpty(request.Watermark.Text))
         {
-            var logDetails = new WatermarkApiSchema.LogDetails
-            {
-                Timestamp = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}",
-                RequestMethod = "POST",
-                RequestBody = request,
-                RequestUrl = "/image/process",
-                StatusCode = 422,
-            };
-
-            _logger.LogInformation("invalid input while processing the image. {@LogDetails}", JsonConvert.SerializeObject(logDetails));
+            _logger.LogWarning("invalid input while processing the image. The SourceImage: {SourceImage}, Watermark: {Watermark}", request.SourceImage, request.Watermark.Text);
             return StatusCode(422, new { error = "invalid input" });
         }
         
@@ -66,16 +56,7 @@ public class ImageController : ControllerBase
         }
         catch (Exception ex)
         {
-            var logDetails = new WatermarkApiSchema.LogDetails
-            {
-                Timestamp = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}",
-                RequestMethod = "POST",
-                RequestBody = request,
-                RequestUrl = "/image/process",
-                StatusCode = 500,
-                Response = ex.Message
-            };
-            _logger.LogError("An error occurred while processing the image. {@LogDetails}", JsonConvert.SerializeObject(logDetails));
+            _logger.LogError("An error occurred while processing the image. The SourceImage: {SourceImage}, Watermark: {Watermark}, ErrorMessage: {ErrorMessage}", request.SourceImage, request.Watermark.Text, ex.Message);
             var errorResponse = new
             {
                 error = ex.Message
