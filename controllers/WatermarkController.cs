@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing;
@@ -27,6 +28,21 @@ public class ImageController : ControllerBase
     [HttpPost("process")]
     public IActionResult AddWatermark([FromBody] WatermarkApiSchema.WatermarkRequest request)
     {
+        if (string.IsNullOrEmpty(request.SourceImage) || string.IsNullOrEmpty(request.Watermark.Text))
+        {
+            var logDetails = new WatermarkApiSchema.LogDetails
+            {
+                Timestamp = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}",
+                RequestMethod = "POST",
+                RequestBody = request,
+                RequestUrl = "/image/process",
+                StatusCode = 422,
+            };
+
+            _logger.LogInformation("invalid input while processing the image. {@LogDetails}", JsonConvert.SerializeObject(logDetails));
+            return StatusCode(422, new { error = "invalid input" });
+        }
+        
         try
         {
             // Convert input Base64 string to byte array
@@ -41,18 +57,6 @@ public class ImageController : ControllerBase
             using var imageSmall = Image.Load(inputBytes);
             imageSmall.Mutate(x => x.Resize(_resizeSettings.Width, _resizeSettings.Height));
             var resizedBase64 = AddWatermark(imageSmall, request.Watermark.Text);
-
-            var logDetails = new WatermarkApiSchema.LogDetails
-            {
-                Timestamp = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}",
-                RequestMethod = "POST",
-                RequestBody = request,
-                RequestUrl = "/image/process",
-                StatusCode = 200,
-                Response = outputBase64
-            };
-
-            _logger.LogInformation("Image processed successfully. {@LogDetails}", logDetails);
 
             return Ok(new
             {
@@ -71,7 +75,7 @@ public class ImageController : ControllerBase
                 StatusCode = 500,
                 Response = ex.Message
             };
-            _logger.LogError("An error occurred while processing the image. {@LogDetails}", logDetails);
+            _logger.LogError("An error occurred while processing the image. {@LogDetails}", JsonConvert.SerializeObject(logDetails));
             var errorResponse = new
             {
                 error = ex.Message
