@@ -27,6 +27,12 @@ public class ImageController : ControllerBase
     [HttpPost("process")]
     public IActionResult AddWatermark([FromBody] WatermarkApiSchema.WatermarkRequest request)
     {
+        if (string.IsNullOrEmpty(request.SourceImage) || string.IsNullOrEmpty(request.Watermark.Text))
+        {
+            _logger.LogWarning("invalid input while processing the image. The SourceImage: {SourceImage}, Watermark: {Watermark}", request.SourceImage, request.Watermark.Text);
+            return StatusCode(422, new { error = "invalid input" });
+        }
+        
         try
         {
             // Convert input Base64 string to byte array
@@ -42,18 +48,6 @@ public class ImageController : ControllerBase
             imageSmall.Mutate(x => x.Resize(_resizeSettings.Width, _resizeSettings.Height));
             var resizedBase64 = AddWatermark(imageSmall, request.Watermark.Text);
 
-            var logDetails = new WatermarkApiSchema.LogDetails
-            {
-                Timestamp = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}",
-                RequestMethod = "POST",
-                RequestBody = request,
-                RequestUrl = "/image/process",
-                StatusCode = 200,
-                Response = outputBase64
-            };
-
-            _logger.LogInformation("Image processed successfully. {@LogDetails}", logDetails);
-
             return Ok(new
             {
                 ProcessedImage = $"data:image/webp;base64,{outputBase64}",
@@ -62,16 +56,7 @@ public class ImageController : ControllerBase
         }
         catch (Exception ex)
         {
-            var logDetails = new WatermarkApiSchema.LogDetails
-            {
-                Timestamp = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}",
-                RequestMethod = "POST",
-                RequestBody = request,
-                RequestUrl = "/image/process",
-                StatusCode = 500,
-                Response = ex.Message
-            };
-            _logger.LogError("An error occurred while processing the image. {@LogDetails}", logDetails);
+            _logger.LogError("An error occurred while processing the image. The SourceImage: {SourceImage}, Watermark: {Watermark}, ErrorMessage: {ErrorMessage}", request.SourceImage, request.Watermark.Text, ex.Message);
             var errorResponse = new
             {
                 error = ex.Message
