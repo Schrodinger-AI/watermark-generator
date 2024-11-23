@@ -1,5 +1,5 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
+ARG servicename
 WORKDIR /app
-COPY out .
 COPY ./font/*.ttf /app/font/
-ENTRYPOINT ["dotnet", "WatermarkGenerator.dll"]
+COPY out/$servicename .
